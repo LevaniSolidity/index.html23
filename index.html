@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arc Yield Vault</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+        
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #0B0E14;
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(99, 102, 241, 0.08) 0%, transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.08) 0%, transparent 25%);
+            color: #ffffff;
+        }
+
+        .glass-card {
+            background: rgba(22, 27, 34, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.2);
+        }
+
+        .input-group {
+            background: rgba(11, 14, 20, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            transition: all 0.2s;
+        }
+
+        .input-group:focus-within {
+            border-color: #6366f1;
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0B0E14; }
+        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+
+        @keyframes fade-in {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-enter { animation: fade-in 0.5s ease-out forwards; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <nav class="border-b border-gray-800/50 bg-[#0B0E14]/80 backdrop-blur-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                    <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                </div>
+                <span class="text-xl font-bold tracking-tight">Arc<span class="text-indigo-500">Yield</span></span>
+            </div>
+            
+            <div class="flex items-center gap-4">
+                <div class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-900 border border-gray-800">
+                    <div class="w-2 h-2 bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
+                    <span class="text-xs font-medium text-gray-400">Arc Testnet</span>
+                </div>
+                <button id="connectBtn" class="bg-white text-black hover:bg-gray-100 px-5 py-2 rounded-lg text-sm font-semibold transition-all">
+                    Connect Wallet
+                </button>
+                <div id="walletAddress" class="hidden px-4 py-2 rounded-lg bg-gray-900 border border-gray-800 text-sm font-mono text-gray-300"></div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="flex-1 max-w-7xl mx-auto w-full p-6 grid grid-cols-1 lg:grid-cols-3 gap-8 mt-4">
+        
+        <div class="lg:col-span-2 space-y-6 animate-enter">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="glass-card p-5 rounded-xl">
+                    <p class="text-xs text-gray-400 uppercase tracking-wider mb-1">Total Value Locked</p>
+                    <p class="text-2xl font-bold text-white" id="tvl">$0</p>
+                </div>
+                <div class="glass-card p-5 rounded-xl">
+                    <p class="text-xs text-gray-400 uppercase tracking-wider mb-1">Current APY</p>
+                    <div class="flex items-center gap-2">
+                        <p class="text-2xl font-bold text-emerald-400">4.85%</p>
+                        <span class="text-[10px] bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded">LIVE</span>
+                    </div>
+                </div>
+                <div class="glass-card p-5 rounded-xl">
+                    <p class="text-xs text-gray-400 uppercase tracking-wider mb-1">Your Earned Yield</p>
+                    <p class="text-2xl font-bold text-indigo-400" id="userRewards">0.00</p>
+                </div>
+            </div>
+
+            <div class="glass-card p-6 rounded-2xl h-[400px] flex flex-col">
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <h2 class="text-lg font-semibold">Performance</h2>
+                        <p class="text-sm text-gray-500">USYC Yield History</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button class="px-3 py-1 text-xs rounded-md bg-gray-800 text-white">1W</button>
+                        <button class="px-3 py-1 text-xs rounded-md hover:bg-gray-800 text-gray-400">1M</button>
+                        <button class="px-3 py-1 text-xs rounded-md hover:bg-gray-800 text-gray-400">ALL</button>
+                    </div>
+                </div>
+                <div class="flex-1 relative w-full h-full">
+                    <canvas id="yieldChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="lg:col-span-1 animate-enter" style="animation-delay: 0.1s;">
+            <div class="glass-card rounded-2xl p-6 sticky top-24">
+                
+                <div class="flex bg-gray-900/50 p-1 rounded-xl mb-6">
+                    <button id="depositTab" class="flex-1 py-2.5 rounded-lg text-sm font-semibold bg-gray-800 text-white shadow-sm transition-all">Deposit</button>
+                    <button id="withdrawTab" class="flex-1 py-2.5 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-300 transition-all">Withdraw</button>
+                </div>
+
+                <div class="space-y-4">
+                    <div class="flex justify-between text-xs text-gray-400 px-1">
+                        <span>Enter Amount</span>
+                        <span>Bal: <span id="tokenBalance" class="text-gray-200">0.00</span> <span id="balanceLabel">USDC</span></span>
+                    </div>
+
+                    <div class="input-group rounded-xl p-4 relative">
+                        <div class="flex justify-between items-center mb-2">
+                            <input type="number" id="amountInput" placeholder="0.00" 
+                                class="w-full bg-transparent text-3xl font-medium focus:outline-none text-white placeholder-gray-600">
+                            <button onclick="setMaxAmount()" class="text-xs font-bold text-indigo-400 hover:text-indigo-300 px-2 py-1 rounded bg-indigo-500/10">MAX</button>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-[8px] font-bold">$</div>
+                            <span class="text-sm font-medium text-gray-300" id="currencyLabel">USDC</span>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3 py-3 border-t border-dashed border-gray-800">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-500">Exchange Rate</span>
+                            <span class="text-gray-300" id="rateDisplay">1 USDC ≈ 0.8966 USYC</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-500">You Receive</span>
+                            <span class="text-white font-semibold" id="receiveAmount">0.00 USYC</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-500">Your Stake</span>
+                            <span class="text-indigo-400 font-semibold" id="userStaked">0.00</span>
+                        </div>
+                    </div>
+
+                    <button onclick="executeAction()" id="actionBtn" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-4 rounded-xl text-lg transition-all shadow-lg shadow-indigo-600/20 disabled:opacity-50 disabled:cursor-not-allowed">
+                        Connect Wallet First
+                    </button>
+                    
+                    <div id="statusMessage" class="hidden text-center text-xs p-2 rounded bg-gray-800 text-gray-300"></div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+    const vaultAddress = "0x7d846916eA81ee15a6657AF742865AC94F9290B3";  
+    const usdcAddress = "0x3600000000000000000000000000000000000000";  
+    const usycAddress = "0xe9185F0c5F296Ed1797AaE4238D26CCaBEadb86C";
+        
+        let provider, signer, vault, usdc, usyc, account;
+        let mode = 'deposit';
+        const usycPrice = 1.115396;
+
+        const amountInput = document.getElementById("amountInput");
+        const actionBtn = document.getElementById("actionBtn");
+        const statusMsg = document.getElementById("statusMessage");
+
+        const ctx = document.getElementById('yieldChart').getContext('2d');
+        const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+        gradient.addColorStop(0, 'rgba(99, 102, 241, 0.5)');
+        gradient.addColorStop(1, 'rgba(99, 102, 241, 0.0)');
+
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'],
+                datasets: [{
+                    label: 'Yield Growth',
+                    data: [1.00, 1.02, 1.05, 1.08, 1.12, 1.15, 1.18],
+                    borderColor: '#6366f1',
+                    backgroundColor: gradient,
+                    borderWidth: 3,
+                    pointRadius: 0,
+                    pointHoverRadius: 6,
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { grid: { display: false }, ticks: { color: '#6b7280' } },
+                    y: { grid: { color: '#1f2937' }, ticks: { color: '#6b7280' } }
+                }
+            }
+        });
+
+        async function connect() {
+            if (!window.ethereum) return alert("Please install MetaMask");
+            try {
+                provider = new ethers.BrowserProvider(window.ethereum);
+                signer = await provider.getSigner();
+                account = await signer.getAddress();
+
+                const vaultABI = [
+                    "function depositLocal(uint256,address)", 
+                    "function redeemForUSDC(uint256,address)", 
+                    "function totalAssets() view returns(uint256)", 
+                    "function balanceOf(address) view returns(uint256)"
+                ]; 
+                const erc20ABI = [
+                    "function approve(address,uint256)", 
+                    "function allowance(address,address) view returns(uint256)", 
+                    "function balanceOf(address) view returns(uint256)",
+                    "function decimals() view returns(uint8)"
+                ];
+                
+                vault = new ethers.Contract(vaultAddress, vaultABI, signer);
+                usdc = new ethers.Contract(usdcAddress, erc20ABI, signer);
+                usyc = new ethers.Contract(usycAddress, erc20ABI, signer);
+
+                document.getElementById("connectBtn").classList.add("hidden");
+                const addrEl = document.getElementById("walletAddress");
+                addrEl.textContent = account.slice(0,6) + "..." + account.slice(-4);
+                addrEl.classList.remove("hidden");
+                
+                actionBtn.textContent = "Deposit USDC";
+                actionBtn.disabled = false;
+                
+                await updateData(); 
+
+            } catch (err) { 
+                console.error(err);
+                alert("Connection failed");
+            }
+        }
+
+        async function updateData() {
+            try {
+                const totalAssets = await vault.totalAssets();
+                const tvlFormatted = parseFloat(ethers.formatUnits(totalAssets, 6)).toLocaleString('en-US', {
+                    style: 'currency',
+                    currency: 'USD',
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0
+                });
+                document.getElementById("tvl").textContent = tvlFormatted;
+
+                if (account) {
+                    const usdcBal = await usdc.balanceOf(account);
+                    const usycBal = await usyc.balanceOf(account);
+                    const vaultBal = await vault.balanceOf(account);
+                    
+                    const usdcFormatted = parseFloat(ethers.formatUnits(usdcBal, 6)).toFixed(2);
+                    const usycFormatted = parseFloat(ethers.formatUnits(usycBal, 6)).toFixed(2);
+                    const vaultFormatted = parseFloat(ethers.formatUnits(vaultBal, 6)).toFixed(2);
+                    
+                    if (mode === 'deposit') {
+                        document.getElementById("tokenBalance").textContent = usdcFormatted;
+                    } else {
+                        document.getElementById("tokenBalance").textContent = usycFormatted;
+                    }
+                    
+                    document.getElementById("userStaked").textContent = vaultFormatted + " USYC";
+                    
+                    const earnedYield = parseFloat(vaultFormatted) * usycPrice - parseFloat(vaultFormatted);
+                    document.getElementById("userRewards").textContent = earnedYield.toFixed(4);
+                }
+
+            } catch (err) {
+                console.error("Error updating data:", err);
+            }
+        }
+
+        async function executeAction() {
+            if (!account) { 
+                await connect(); 
+                return; 
+            }
+            
+            const val = amountInput.value;
+            if(!val || parseFloat(val) <= 0) {
+                setStatus("Enter valid amount", "red");
+                return;
+            }
+
+            try {
+                setStatus("Processing Transaction...", "blue");
+                actionBtn.disabled = true;
+
+                if (mode === 'deposit') {
+                    const amount = ethers.parseUnits(val, 6);
+                    const allowance = await usdc.allowance(account, vaultAddress);
+                    
+                    if (allowance < amount) {
+                        setStatus("Approving USDC...", "blue");
+                        const approveTx = await usdc.approve(vaultAddress, amount);
+                        await approveTx.wait();
+                    }
+                    
+                    setStatus("Depositing...", "blue");
+                    const depositTx = await vault.depositLocal(amount, account);
+                    await depositTx.wait();
+                    
+                } else {
+                    const amount = ethers.parseUnits(val, 6);
+                    setStatus("Withdrawing...", "blue");
+                    const withdrawTx = await vault.redeemForUSDC(amount, account);
+                    await withdrawTx.wait();
+                }
+                
+                setStatus("Success! Transaction Mined.", "green");
+                amountInput.value = "";
+                await updateData();
+                
+            } catch (err) {
+                console.error(err);
+                setStatus("Transaction failed: " + (err.reason || err.message), "red");
+            } finally {
+                actionBtn.disabled = false;
+            }
+        }
+
+        function setMaxAmount() {
+            const balance = document.getElementById("tokenBalance").textContent.replace(",", "");
+            amountInput.value = balance;
+            amountInput.dispatchEvent(new Event('input'));
+        }
+
+        function setStatus(msg, color) {
+            statusMsg.textContent = msg;
+            statusMsg.classList.remove("hidden");
+            const colorClasses = {
+                'green': 'bg-green-500/20 text-green-400',
+                'blue': 'bg-blue-500/20 text-blue-400',
+                'red': 'bg-red-500/20 text-red-400'
+            };
+            statusMsg.className = `text-center text-xs p-2 rounded mt-2 ${colorClasses[color]}`;
+        }
+
+        const depTab = document.getElementById("depositTab");
+        const witTab = document.getElementById("withdrawTab");
+        const rateDisplay = document.getElementById("rateDisplay");
+        const currencyLabel = document.getElementById("currencyLabel");
+        const balanceLabel = document.getElementById("balanceLabel");
+
+        depTab.onclick = async () => {
+            mode = 'deposit';
+            depTab.className = "flex-1 py-2.5 rounded-lg text-sm font-semibold bg-gray-800 text-white shadow-sm transition-all";
+            witTab.className = "flex-1 py-2.5 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-300 transition-all";
+            actionBtn.textContent = "Deposit USDC";
+            currencyLabel.textContent = "USDC";
+            balanceLabel.textContent = "USDC";
+            
+            if (account) await updateData();
+            amountInput.dispatchEvent(new Event('input'));
+        };
+
+        witTab.onclick = async () => {
+            mode = 'withdraw';
+            witTab.className = "flex-1 py-2.5 rounded-lg text-sm font-semibold bg-gray-800 text-white shadow-sm transition-all";
+            depTab.className = "flex-1 py-2.5 rounded-lg text-sm font-semibold text-gray-500 hover:text-gray-300 transition-all";
+            actionBtn.textContent = "Withdraw USDC";
+            currencyLabel.textContent = "USYC";
+            balanceLabel.textContent = "USYC";
+            
+            if (account) await updateData();
+            amountInput.dispatchEvent(new Event('input'));
+        };
+
+        document.getElementById("connectBtn").onclick = connect;
+        
+        amountInput.addEventListener("input", (e) => {
+             const val = parseFloat(e.target.value) || 0;
+             
+             if(mode === 'deposit') {
+                 const received = val / usycPrice;
+                 document.getElementById("receiveAmount").textContent = received.toFixed(4) + " USYC";
+                 rateDisplay.textContent = `1 USDC ≈ ${(1/usycPrice).toFixed(6)} USYC`;
+             } else {
+                 const received = val * usycPrice;
+                 document.getElementById("receiveAmount").textContent = received.toFixed(4) + " USDC";
+                 rateDisplay.textContent = `1 USYC ≈ ${usycPrice.toFixed(4)} USDC`;
+             }
+        });
+    </script>
+</body>
+</html>
